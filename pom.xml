@@ -1,16 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.mandarina</groupId>
-	<artifactId>pepe</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>pepe</name>
+	<artifactId>dforg</artifactId>
+	<version>0.0.1</version>
+	<name>dforg</name>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>19</maven.compiler.source>
 		<maven.compiler.target>19</maven.compiler.target>
 	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>2.11.0</version>
+		</dependency>
+	</dependencies>
+
 	<build>
 		<pluginManagement>
 			<!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
@@ -56,8 +64,26 @@
 				</plugin>
 			</plugins>
 		</pluginManagement>
-		
+
 		<plugins>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-dependencies</id>
+						<phase>prepare-package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/libs</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
 			<plugin>
 				<!-- Build an executable JAR -->
 				<groupId>org.apache.maven.plugins</groupId>
@@ -67,40 +93,56 @@
 						<manifest>
 							<addClasspath>true</addClasspath>
 							<classpathPrefix>lib/</classpathPrefix>
-							<mainClass>com.mandarina.pepe.App</mainClass>
+							<mainClass>com.mandarina.App</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
 			</plugin>
-			
+
 			<plugin>
-                <groupId>org.panteleyev</groupId>
-                <artifactId>jpackage-maven-plugin</artifactId>
-                <version>1.6.0</version>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+						<configuration>
+							<archive>
+							<manifest>
+								<mainClass>com.mandarina.App</mainClass>
+							</manifest>
+							</archive>
+							<descriptorRefs>
+								<descriptorRef>jar-with-dependencies</descriptorRef>
+							</descriptorRefs>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>			
 
-                <configuration>
-                    <name>pepe</name>
-                    <appVersion>${project.version}</appVersion>
-                    <input>${project.build.directory}</input>
-                    <mainJar>${project.artifactId}-${project.version}.jar</mainJar>
-                    <mainClass>com.mandarina.pepe.App</mainClass>
-                    <destination>${project.build.directory}</destination>
-                    <javaOptions>
-                        <option>-Dfile.encoding=UTF-8</option>
-                    </javaOptions>
-                </configuration>
+			<plugin>
+				<groupId>org.panteleyev</groupId>
+				<artifactId>jpackage-maven-plugin</artifactId>
+				<version>1.6.0</version>
+				<configuration>
+					<type>MSI</type>
+					<name>dforg</name>
+					<appVersion>${project.version}</appVersion>
+					<input>${project.build.directory}</input>
+					<destination>${project.build.directory}</destination>
+					<mainJar>${project.artifactId}-${project.version}-jar-with-dependencies.jar</mainJar>
+					<mainClass>com.mandarina.App</mainClass>
+					<destination>${project.build.directory}</destination>
+					<winConsole>true</winConsole>
+					<javaOptions>
+						<option>-Dfile.encoding=UTF-8</option>
+					</javaOptions>
+				</configuration>
+			</plugin>
 
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <id>win</id>-->
-<!--                        <configuration>-->
-<!--                            <winMenu>true</winMenu>-->
-<!--                        </configuration>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-            </plugin>			
-			
 		</plugins>
-		
+
 	</build>
 </project>

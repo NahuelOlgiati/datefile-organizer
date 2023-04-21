@@ -1,18 +1,20 @@
-package com.mandarina.pepe;
+package com.mandarina;
 
-import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.AbstractMap;
+
+import org.apache.commons.io.FilenameUtils;
 
 public class FileNameMatcher {
 
-	public static LocalDate match(Path path) {
+	public static AbstractMap.SimpleEntry<FileNameType, LocalDate> match(Path path) {
 		for (FileNameType m : FileNameType.values()) {
 			if (m.matchExt(path)) {
 				LocalDate matchDate = m.matchDate(path);
 				if (matchDate != null) {
-					return matchDate;
+					return new AbstractMap.SimpleEntry<FileNameType, LocalDate>(m, matchDate);
 				}
 			}
 		}
@@ -70,12 +72,22 @@ public class FileNameMatcher {
 		}
 
 		public boolean matchExt(Path path) {
-			return FileSystems.getDefault().getPathMatcher("glob:/**/*.".concat(this.getExt())).matches(path);
+			return FilenameUtils.getExtension(path.getFileName().toString()).equals(this.getExt());
 		}
 	}
 
-	private enum VideoImage {
-		VIDEO, //
-		IMAGE;
+	public enum VideoImage {
+		VIDEO("Videos"), //
+		IMAGE("Images");
+
+		private String label;
+
+		VideoImage(String label) {
+			this.label = label;
+		}
+
+		public String getLabel() {
+			return label;
+		}
 	}
 }
