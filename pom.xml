@@ -11,14 +11,14 @@
 		<maven.compiler.source>20</maven.compiler.source>
 		<maven.compiler.target>20</maven.compiler.target>
 		<javafx.version>20.0.1</javafx.version>
-		<dfor.version>1.0.0</dfor.version>
+		<dfor.version>1.0.0-SNAPSHOT</dfor.version>
 	</properties>
 	
     <scm>
         <url>https://github.com/NahuelOlgiati/datefile-organizer</url>
         <connection>scm:git:https://github.com/NahuelOlgiati/datefile-organizer.git</connection>
         <developerConnection>scm:git:https://github.com/NahuelOlgiati/datefile-organizer.git</developerConnection>
-        <tag>dforg-1.0.0</tag>
+        <tag>HEAD</tag>
     </scm>
 
 	<dependencies>
