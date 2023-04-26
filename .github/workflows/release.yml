@@ -20,4 +20,4 @@ jobs:
      - uses: AButler/upload-release-assets@v2.0
        with:
          files: 'target/release/*'
-         repo-token: ${{ secrets.GITHUB_TOKEN }}
+         repo-token: ${{ secrets.TOKEN }}
