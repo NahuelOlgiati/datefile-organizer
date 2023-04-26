@@ -13,11 +13,11 @@ jobs:
          java-version: 20
          distribution: "oracle"
      - run: mvn verify
-     - uses: actions/upload-artifact@v1
+     - uses: actions/upload-artifact@v3
        with:
-           name: ${{ matrix.releasename }}
+           name: dforg
            path: 'target/release'
      - uses: AButler/upload-release-assets@v2.0
        with:
-         files: 'target/*.msi'
+         files: 'target/release/*'
          repo-token: ${{ secrets.GITHUB_TOKEN }}
