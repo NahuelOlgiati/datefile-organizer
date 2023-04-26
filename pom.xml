@@ -152,7 +152,7 @@
 								<argument>--main-jar</argument>
 								<argument>./${project.artifactId}-${dfor.version}.jar</argument>
 								<argument>--dest</argument>
-								<argument>${project.build.directory}</argument>
+								<argument>${project.build.directory}/release</argument>
 								<argument>--icon</argument>
 								<argument>../assets/nina.ico</argument>
 								<argument>--name</argument>
