@@ -11,7 +11,6 @@
 		<maven.compiler.source>20</maven.compiler.source>
 		<maven.compiler.target>20</maven.compiler.target>
 		<javafx.version>20.0.1</javafx.version>
-		<dfor.version>1.0.0</dfor.version>
 	</properties>
 
 	<scm>
@@ -151,14 +150,12 @@
 							<arguments>
 								<argument>--type</argument>
 								<argument>msi</argument>
-								<argument>--app-version</argument>
-								<argument>${dfor.version}</argument>
 								<argument>--input</argument>
 								<argument>${project.build.directory}/libs</argument>
 								<argument>--main-class</argument>
 								<argument>com.mandarina.App</argument>
 								<argument>--main-jar</argument>
-								<argument>./${project.artifactId}-${dfor.version}.jar</argument>
+								<argument>./${project.artifactId}-${project.version}.jar</argument>
 								<argument>--dest</argument>
 								<argument>${project.build.directory}/release</argument>
 								<argument>--icon</argument>
