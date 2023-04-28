@@ -10,8 +10,9 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
+import java.util.AbstractMap.SimpleEntry;
 
-import com.mandarina.FileNameMatcher.FileNameType;
+import com.mandarina.FileMatcher.VideoImage;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -117,17 +118,11 @@ public class Organizer {
 
 	private static void org(boolean copy, Path path, Path workPath, Path matchPath, Path unmatchPath)
 			throws IOException {
-		var match = FileNameMatcher.match(path);
+		var match = FileMatcher.match(path);
 		if (match != null) {
-			var matcher = match.getKey();
-			var dateMatch = match.getValue();
-			if (dateMatch != null) {
-				appendFileName(path, matchPath);
-				if (copy) {
-					copy(matcher, dateMatch, path, workPath);
-				}
-			} else {
-				appendFileName(path, unmatchPath);
+			appendFileName(path, matchPath);
+			if (copy) {
+				copy(match, path, workPath);
 			}
 		} else {
 			appendFileName(path, unmatchPath);
@@ -138,9 +133,9 @@ public class Organizer {
 		Files.write(matchPath, getBytes(path), StandardOpenOption.APPEND);
 	}
 
-	private static void copy(FileNameType matcher, LocalDate dateMatch, Path path, Path workPath) throws IOException {
-		var datePath = Paths.get(workPath.toString(), matcher.getVideoImage().getLabel(),
-				dateMatch.getYear() + "-" + String.format("%02d", dateMatch.getMonthValue()),
+	private static void copy(SimpleEntry<VideoImage, LocalDate> match, Path path, Path workPath) throws IOException {
+		var datePath = Paths.get(workPath.toString(), match.getKey().getLabel(),
+				match.getValue().getYear() + "-" + String.format("%02d", match.getValue().getMonthValue()),
 				path.getFileName().toString());
 		createDirectories(datePath.getParent());
 		Files.copy(path, datePath, StandardCopyOption.REPLACE_EXISTING);
