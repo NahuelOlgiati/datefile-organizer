@@ -7,7 +7,6 @@ import java.nio.file.Paths;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.NodeOrientation;
-//import javafx.event.EventHandler;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
@@ -15,7 +14,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-//import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
@@ -28,13 +26,15 @@ import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
-//import javafx.stage.WindowEvent;
 
 public class App extends Application {
+
+	private Label statusLabel;
+	private Button orgButton;
+	private Button stopButton;
+
 	public static void main(String[] args) throws Exception {
-		System.out.println("Hello World!");
 		launch(args);
-		System.out.println("Finito!");
 	}
 
 	@Override
@@ -74,46 +74,16 @@ public class App extends Application {
 		copyCheckBox.setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
 
 		var processHBox = new HBox(5);
-		var orgButton = new Button("Process");
-		var statusLabel = new Label();
+		orgButton = new Button("Process");
+		stopButton = new Button("Stop");
+		stopButton.setDisable(true);
+		statusLabel = new Label();
 		statusLabel.setPadding(new Insets(5));
-		processHBox.getChildren().addAll(orgButton, statusLabel);
-		orgButton.setOnAction(e -> {
-			boolean copy = copyCheckBox.isSelected();
-			var sourceFolderPath = sourceTextField.getText();
-			var targetFolderPath = targetTextField.getText();
-			var sourcePath = Paths.get(sourceFolderPath);
-			var targetPath = Paths.get(targetFolderPath);
-			try {
-				String msg = Organizer.valid(sourceFolderPath, targetFolderPath, sourcePath, targetPath);
-				if (msg == null) {
-					statusLabel.setText("Starting...");
-					Organizer.process(copy, sourcePath, targetPath, statusLabel);
-					statusLabel.setText("Finito!");
-				} else {
-					alert(cl, msg);
-				}
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-		});
+		processHBox.getChildren().addAll(orgButton, stopButton, statusLabel);
+		orgButton.setOnAction(e -> organize(cl, sourceTextField, targetTextField, copyCheckBox));
 
-//		TextArea textArea = new TextArea();
-//		TextAreaSystemReader textAreaSystemReader = new TextAreaSystemReader(textArea);
-//		try {
-//			textAreaSystemReader.startRead();
-//			primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
-//				@Override
-//				public void handle(WindowEvent e) {
-//					textAreaSystemReader.stopRead();
-//				}
-//			});
-//		} catch (IOException e1) {
-//			e1.printStackTrace();
-//		}
-
-		VBox mainVBox = new VBox(10);
-		mainVBox.getChildren().addAll(sourceHBox, targetHBox, copyCheckBox, new VBox(10), processHBox/* , textArea */);
+		var mainVBox = new VBox(10);
+		mainVBox.getChildren().addAll(sourceHBox, targetHBox, copyCheckBox, new VBox(10), processHBox);
 
 		var mainGridPane = new GridPane();
 		mainGridPane.setPadding(new Insets(15));
@@ -129,6 +99,25 @@ public class App extends Application {
 		primaryStage.show();
 	}
 
+	private void organize(ClassLoader cl, TextField sourceTextField, TextField targetTextField, CheckBox copyCheckBox) {
+		boolean copy = copyCheckBox.isSelected();
+		var sourceFolderPath = sourceTextField.getText();
+		var targetFolderPath = targetTextField.getText();
+		var sourcePath = Paths.get(sourceFolderPath);
+		var targetPath = Paths.get(targetFolderPath);
+		String msg = Organizer.valid(sourceFolderPath, targetFolderPath, sourcePath, targetPath);
+		if (msg == null) {
+			Organizer organizer = new Organizer(copy, sourcePath, targetPath, orgButton, stopButton, statusLabel);
+			try {
+				organizer.copyRoutine();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		} else {
+			alert(cl, msg);
+		}
+	}
+
 	private static void alert(ClassLoader cl, String message) {
 		var alert = new Alert(AlertType.WARNING);
 		((Stage) alert.getDialogPane().getScene().getWindow()).getIcons()
@@ -137,5 +126,4 @@ public class App extends Application {
 		alert.setContentText(message);
 		alert.show();
 	}
-
 }
