@@ -12,44 +12,45 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
 import java.util.AbstractMap.SimpleEntry;
 
-import com.mandarina.FileMatcher.VideoImage;
+import com.mandarina.match.FileMatcher;
+import com.mandarina.match.MimeMatcher;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 
 public class Organizer {
 
 	private boolean copy;
 	private Path sourcePath;
 	private Path targetPath;
+
+	private Path failPath;
+	private Path mediaunmatchPath;
+	private Path unmatchPath;
+	private Path matchPath;
+
 	private Button orgButton;
 	private Button stopButton;
-	private Label statusLabel;
+	private TextField statusField;
 
 	private Task<Void> copyTask;
 	private int copiedFilesCount;
 
 	public Organizer(boolean copy, Path sourcePath, Path targetPath, Button orgButton, Button stopButton,
-			Label statusLabel) {
+			TextField statusField) {
 		this.copy = copy;
 		this.sourcePath = sourcePath;
 		this.targetPath = targetPath;
 		this.orgButton = orgButton;
 		this.stopButton = stopButton;
-		this.statusLabel = statusLabel;
+		this.statusField = statusField;
 	}
 
-	public void copyRoutine() throws IOException {
+	public void organize() throws IOException {
 
-		createDirectories(targetPath);
-
-		var unmatchPath = targetPath.resolve("unmatch.txt");
-		recreateFile(unmatchPath);
-
-		var matchPath = targetPath.resolve("match.txt");
-		recreateFile(matchPath);
+		initPaths();
 
 		copiedFilesCount = 0;
 
@@ -95,19 +96,18 @@ public class Organizer {
 							return FileVisitResult.TERMINATE;
 						}
 
-						org(copy, file, targetPath, matchPath, unmatchPath);
+						organize(copy, file);
 						copiedFilesCount++;
 						updateMessage(file.toString());
 
 						return FileVisitResult.CONTINUE;
 					}
 				});
-
 				return null;
 			}
 		};
 
-		statusLabel.textProperty().bind(copyTask.messageProperty());
+		statusField.textProperty().bind(copyTask.messageProperty());
 
 		copyTask.setOnFailed(e -> doTaskEventCloseRoutine());
 		copyTask.setOnCancelled(e -> doTaskEventCloseRoutine());
@@ -116,25 +116,51 @@ public class Organizer {
 		new Thread(copyTask).start(); // Run the copy task
 	}
 
-	private static void org(boolean copy, Path path, Path workPath, Path matchPath, Path unmatchPath)
-			throws IOException {
-		var match = FileMatcher.match(path);
-		if (match != null) {
-			appendFileName(path, matchPath);
-			if (copy) {
-				copy(match, path, workPath);
+	private void initPaths() throws IOException {
+		createDirectories(targetPath);
+
+		failPath = targetPath.resolve("fail.txt");
+		recreateFile(failPath);
+
+		mediaunmatchPath = targetPath.resolve("mediaunmatch.txt");
+		recreateFile(mediaunmatchPath);
+
+		unmatchPath = targetPath.resolve("unmatch.txt");
+		recreateFile(unmatchPath);
+
+		matchPath = targetPath.resolve("match.txt");
+		recreateFile(matchPath);
+	}
+
+	private void organize(boolean copy, Path path) {
+		try {
+			var match = FileMatcher.match(path);
+			if (match != null) {
+				if (match.getKey() != null) {
+					appendFileName(path, matchPath);
+					if (copy) {
+						copy(match, path);
+					}
+				} else {
+					appendFileName(path, mediaunmatchPath);
+				}
+			} else {
+				appendFileName(path, unmatchPath);
 			}
-		} else {
-			appendFileName(path, unmatchPath);
+		} catch (Exception e) {
+			try {
+				appendFileName(path, failPath);
+			} catch (IOException e1) {
+			}
 		}
 	}
 
-	private static void appendFileName(Path path, Path matchPath) throws IOException {
+	private void appendFileName(Path path, Path matchPath) throws IOException {
 		Files.write(matchPath, getBytes(path), StandardOpenOption.APPEND);
 	}
 
-	private static void copy(SimpleEntry<VideoImage, LocalDate> match, Path path, Path workPath) throws IOException {
-		var datePath = Paths.get(workPath.toString(), match.getKey().getLabel(),
+	private void copy(SimpleEntry<MimeMatcher, LocalDate> match, Path path) throws IOException {
+		var datePath = Paths.get(targetPath.toString(), match.getKey().getLabel(),
 				match.getValue().getYear() + "-" + String.format("%02d", match.getValue().getMonthValue()),
 				path.getFileName().toString());
 		createDirectories(datePath.getParent());
@@ -161,8 +187,8 @@ public class Organizer {
 	}
 
 	private void doTaskEventCloseRoutine() {
-		statusLabel.textProperty().unbind();
-		statusLabel.setText(copy ? "Copied Files: " + copiedFilesCount : "Processed Files: " + copiedFilesCount);
+		statusField.textProperty().unbind();
+		statusField.setText(copy ? "Copied Files: " + copiedFilesCount : "Processed Files: " + copiedFilesCount);
 		Platform.runLater(() -> {
 			orgButton.setDisable(false);
 			stopButton.setDisable(true);
@@ -181,6 +207,17 @@ public class Organizer {
 		}
 		if (!isDirectory(targetPath)) {
 			return "Parametro targetFolder: is not a directory";
+		}
+		if (sourcePath.equals(targetPath)) {
+			return "Warning: sourceFolder and targetFolder can not be the same folder";
+		} else {
+			Path parent = targetPath.getParent();
+			while (parent != null) {
+				if (sourcePath.equals(parent)) {
+					return "Warning: targetFolder can not be inside sourceFolder";
+				}
+				parent = parent.getParent();
+			}
 		}
 		return null;
 	}

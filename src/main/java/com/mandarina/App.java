@@ -12,7 +12,6 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
@@ -29,7 +28,7 @@ import javafx.stage.Stage;
 
 public class App extends Application {
 
-	private Label statusLabel;
+	private TextField statusField;
 	private Button orgButton;
 	private Button stopButton;
 
@@ -46,9 +45,10 @@ public class App extends Application {
 
 		var sourceHBox = new HBox(5);
 		var sourceButton = new Button("Source Folder");
+		sourceButton.setMinWidth(95);
 		var sourceTextField = new TextField();
 		sourceTextField.setDisable(true);
-		sourceTextField.setPrefWidth(518);
+		sourceTextField.setPrefWidth(590);
 		sourceButton.setOnAction(e -> {
 			File selectedDirectory = new DirectoryChooser().showDialog(primaryStage);
 			if (selectedDirectory != null) {
@@ -59,9 +59,10 @@ public class App extends Application {
 
 		var targetHBox = new HBox(5);
 		var targetButton = new Button("Target Folder ");
+		targetButton.setMinWidth(95);
 		var targetTextField = new TextField();
 		targetTextField.setDisable(true);
-		targetTextField.setPrefWidth(520);
+		targetTextField.setPrefWidth(590);
 		targetButton.setOnAction(e -> {
 			File selectedDirectory = new DirectoryChooser().showDialog(primaryStage);
 			if (selectedDirectory != null) {
@@ -75,11 +76,14 @@ public class App extends Application {
 
 		var processHBox = new HBox(5);
 		orgButton = new Button("Process");
+		orgButton.setMinWidth(60);
 		stopButton = new Button("Stop");
+		stopButton.setMinWidth(50);
 		stopButton.setDisable(true);
-		statusLabel = new Label();
-		statusLabel.setPadding(new Insets(5));
-		processHBox.getChildren().addAll(orgButton, stopButton, statusLabel);
+		statusField = new TextField();
+		statusField.setDisable(true);
+		statusField.setPrefWidth(570);
+		processHBox.getChildren().addAll(orgButton, stopButton, statusField);
 		orgButton.setOnAction(e -> organize(cl, sourceTextField, targetTextField, copyCheckBox));
 
 		var mainVBox = new VBox(10);
@@ -92,7 +96,7 @@ public class App extends Application {
 		mainGridPane.setBackground(bg);
 		mainGridPane.getChildren().add(mainVBox);
 
-		Scene scene = new Scene(mainGridPane, 650, 170);
+		Scene scene = new Scene(mainGridPane, 720, 170);
 		scene.getStylesheets().add(cl.getResource("assets/styles.css").toExternalForm());
 
 		primaryStage.setScene(scene);
@@ -107,9 +111,9 @@ public class App extends Application {
 		var targetPath = Paths.get(targetFolderPath);
 		String msg = Organizer.valid(sourceFolderPath, targetFolderPath, sourcePath, targetPath);
 		if (msg == null) {
-			Organizer organizer = new Organizer(copy, sourcePath, targetPath, orgButton, stopButton, statusLabel);
+			Organizer organizer = new Organizer(copy, sourcePath, targetPath, orgButton, stopButton, statusField);
 			try {
-				organizer.copyRoutine();
+				organizer.organize();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
