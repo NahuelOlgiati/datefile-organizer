@@ -10,125 +10,122 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import com.mandarina.match.FileMatcher;
 import com.mandarina.match.MimeMatcher;
 
-import javafx.application.Platform;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.scene.control.Button;
-import javafx.scene.control.TextField;
 
-public class Organizer {
+public abstract class Organizer {
 
-	private boolean copy;
-	private Path sourcePath;
-	private Path targetPath;
+	protected boolean copy;
+	protected ObservableList<String> listViewItems;
+	protected String targetField;
+
+	protected Task<Void> copyTask;
+	protected int copiedFilesCount;
 
 	private Path failPath;
 	private Path mediaunmatchPath;
 	private Path unmatchPath;
 	private Path matchPath;
 
-	private Button orgButton;
-	private Button stopButton;
-	private TextField statusField;
-
-	private Task<Void> copyTask;
-	private int copiedFilesCount;
-
-	public Organizer(boolean copy, Path sourcePath, Path targetPath, Button orgButton, Button stopButton,
-			TextField statusField) {
+	public Organizer(boolean copy, ObservableList<String> listViewItems, String targetField) {
 		this.copy = copy;
-		this.sourcePath = sourcePath;
-		this.targetPath = targetPath;
-		this.orgButton = orgButton;
-		this.stopButton = stopButton;
-		this.statusField = statusField;
+		this.listViewItems = listViewItems;
+		this.targetField = targetField;
 	}
 
-	public void organize() throws IOException {
+	public abstract void doBeforeOrganize();
 
-		initPaths();
+	public abstract void doAfterOrganize();
 
+	public void organize() throws Exception {
+		initLogs();
 		copiedFilesCount = 0;
-
-		stopButton.setOnAction(e -> {
-			if (copyTask != null) {
-				copyTask.cancel();
-			}
-		});
-
 		copyTask = new Task<Void>() {
 
 			@Override
 			protected Void call() throws Exception {
-
-				Platform.runLater(() -> {
-					orgButton.setDisable(true);
-					stopButton.setDisable(false);
-				});
-
 				Thread.sleep(100);
-				Files.walkFileTree(sourcePath, new SimpleFileVisitor<Path>() {
+				for (String s : listViewItems) {
+					Files.walkFileTree(Paths.get(s), new SimpleFileVisitor<Path>() {
 
-					/*
-					 * Copy the directories.
-					 */
-					@Override
-					public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+						/*
+						 * Copy the directories.
+						 */
+						@Override
+						public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+								throws IOException {
 
-						if (isCancelled()) {
-							return FileVisitResult.TERMINATE;
+							if (isCancelled()) {
+								return FileVisitResult.TERMINATE;
+							}
+
+							return FileVisitResult.CONTINUE;
 						}
 
-						return FileVisitResult.CONTINUE;
-					}
+						/*
+						 * Copy the files.
+						 */
+						@Override
+						public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 
-					/*
-					 * Copy the files.
-					 */
-					@Override
-					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+							if (isCancelled()) {
+								return FileVisitResult.TERMINATE;
+							}
 
-						if (isCancelled()) {
-							return FileVisitResult.TERMINATE;
+							organize(copy, file);
+							copiedFilesCount++;
+							updateMessage(file.toString());
+
+							return FileVisitResult.CONTINUE;
 						}
-
-						organize(copy, file);
-						copiedFilesCount++;
-						updateMessage(file.toString());
-
-						return FileVisitResult.CONTINUE;
-					}
-				});
+					});
+				}
 				return null;
 			}
 		};
 
-		statusField.textProperty().bind(copyTask.messageProperty());
+		doBeforeOrganize();
 
-		copyTask.setOnFailed(e -> doTaskEventCloseRoutine());
-		copyTask.setOnCancelled(e -> doTaskEventCloseRoutine());
-		copyTask.setOnSucceeded(e -> doTaskEventCloseRoutine());
+		copyTask.setOnFailed(e -> doAfterOrganize());
+		copyTask.setOnCancelled(e -> doAfterOrganize());
+		copyTask.setOnSucceeded(e -> doAfterOrganize());
 
 		new Thread(copyTask).start(); // Run the copy task
 	}
 
-	private void initPaths() throws IOException {
-		createDirectories(targetPath);
+	protected void initLogs() throws IOException {
+		var logPath = Paths.get(targetField)//
+				.resolve(".logs")//
+				.resolve(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")));
+		createDirectories(logPath);
 
-		failPath = targetPath.resolve("fail.txt");
+		var mainPath = logPath.resolve("main.log");
+		recreateFile(mainPath);
+		appendLine("dateTime: " + LocalDateTime.now(), mainPath);
+		appendLine("sources: " + listViewItems, mainPath);
+		appendLine("target: " + targetField, mainPath);
+		appendLine("copy: " + copy, mainPath);
+
+		failPath = logPath.resolve("fail.log");
 		recreateFile(failPath);
 
-		mediaunmatchPath = targetPath.resolve("mediaunmatch.txt");
-		recreateFile(mediaunmatchPath);
-
-		unmatchPath = targetPath.resolve("unmatch.txt");
+		unmatchPath = logPath.resolve("unmatch.log");
 		recreateFile(unmatchPath);
 
-		matchPath = targetPath.resolve("match.txt");
+		mediaunmatchPath = logPath.resolve("unmatch-media.log");
+		recreateFile(mediaunmatchPath);
+
+		matchPath = logPath.resolve("match-media.log");
 		recreateFile(matchPath);
 	}
 
@@ -155,12 +152,16 @@ public class Organizer {
 		}
 	}
 
-	private void appendFileName(Path path, Path matchPath) throws IOException {
-		Files.write(matchPath, getBytes(path), StandardOpenOption.APPEND);
+	private void appendFileName(Path fileNamePath, Path targetPath) throws IOException {
+		appendLine(fileNamePath.toString(), targetPath);
+	}
+
+	private void appendLine(String value, Path matchPath) throws IOException {
+		Files.write(matchPath, getLine(value), StandardOpenOption.APPEND);
 	}
 
 	private void copy(SimpleEntry<MimeMatcher, LocalDate> match, Path path) throws IOException {
-		var datePath = Paths.get(targetPath.toString(), match.getKey().getLabel(),
+		var datePath = Paths.get(targetField, match.getKey().getLabel(),
 				match.getValue().getYear() + "-" + String.format("%02d", match.getValue().getMonthValue()),
 				path.getFileName().toString());
 		createDirectories(datePath.getParent());
@@ -173,8 +174,8 @@ public class Organizer {
 		}
 	}
 
-	private static byte[] getBytes(Path path) {
-		return path.toString().concat(System.lineSeparator()).getBytes();
+	private static byte[] getLine(String value) {
+		return value.concat(System.lineSeparator()).getBytes();
 	}
 
 	private static void recreateFile(Path p) throws IOException {
@@ -186,37 +187,36 @@ public class Organizer {
 		}
 	}
 
-	private void doTaskEventCloseRoutine() {
-		statusField.textProperty().unbind();
-		statusField.setText(copy ? "Copied Files: " + copiedFilesCount : "Processed Files: " + copiedFilesCount);
-		Platform.runLater(() -> {
-			orgButton.setDisable(false);
-			stopButton.setDisable(true);
-		});
-	}
-
-	public static String valid(String sourceText, String targetText, Path sourcePath, Path targetPath) {
-		if (sourceText == null || sourceText.isEmpty()) {
+	public static String valid(List<String> listViewItems, String targetFieldText) {
+		if (listViewItems.isEmpty()) {
 			return "Required: source folder";
 		}
-		if (targetText == null || targetText.isEmpty()) {
+		if (targetFieldText == null || targetFieldText.isEmpty()) {
 			return "Required: target folder";
 		}
-		if (!isDirectory(sourcePath)) {
-			return "Parametro targetFolder: is not a directory";
-		}
+		Path targetPath = Paths.get(targetFieldText);
 		if (!isDirectory(targetPath)) {
-			return "Parametro targetFolder: is not a directory";
+			return "Parameter targetFolder: is not a directory";
 		}
-		if (sourcePath.equals(targetPath)) {
-			return "Warning: sourceFolder and targetFolder can not be the same folder";
-		} else {
-			Path parent = targetPath.getParent();
-			while (parent != null) {
-				if (sourcePath.equals(parent)) {
-					return "Warning: targetFolder can not be inside sourceFolder";
+		for (Path sourcePath : listViewItems.stream()//
+				.map(Paths::get)//
+				.collect(Collectors.toList())) {
+			if (!isDirectory(sourcePath)) {
+				return "Parameter sourceFolder: is not a directory";
+			}
+			if (Collections.frequency(listViewItems, sourcePath.toString()) > 1) {
+				return "Parameter sourceFolder: directory repeated";
+			}
+			if (sourcePath.equals(targetPath)) {
+				return "SourceFolder and targetFolder can not be the same folder";
+			} else {
+				Path parent = targetPath.getParent();
+				while (parent != null) {
+					if (sourcePath.equals(parent)) {
+						return "TargetFolder can not be inside sourceFolder";
+					}
+					parent = parent.getParent();
 				}
-				parent = parent.getParent();
 			}
 		}
 		return null;

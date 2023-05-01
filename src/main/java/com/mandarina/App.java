@@ -1,10 +1,11 @@
 package com.mandarina;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
 
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.NodeOrientation;
 import javafx.scene.Scene;
@@ -12,6 +13,9 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
@@ -28,6 +32,11 @@ import javafx.stage.Stage;
 
 public class App extends Application {
 
+	private ListView<String> listView;
+	private Button listViewAddButton;
+	private Button listViewDeleteButton;
+	private Button targetButton;
+	private CheckBox copyCheckBox;
 	private TextField statusField;
 	private Button orgButton;
 	private Button stopButton;
@@ -43,22 +52,43 @@ public class App extends Application {
 		primaryStage.getIcons().add(new Image(cl.getResourceAsStream("assets/nina.png")));
 		primaryStage.setResizable(false);
 
-		var sourceHBox = new HBox(5);
-		var sourceButton = new Button("Source Folder");
-		sourceButton.setMinWidth(95);
-		var sourceTextField = new TextField();
-		sourceTextField.setDisable(true);
-		sourceTextField.setPrefWidth(590);
-		sourceButton.setOnAction(e -> {
-			File selectedDirectory = new DirectoryChooser().showDialog(primaryStage);
-			if (selectedDirectory != null) {
-				sourceTextField.setText(selectedDirectory.toPath().toString());
+		listViewAddButton = new Button("Source Folders");
+		listViewAddButton.setOnAction(this::addSourceFolder);
+		listViewDeleteButton = new Button("Delete");
+		listViewDeleteButton.setDisable(true);
+		listViewDeleteButton.setOnAction(this::deleteSourceFolder);
+		var listViewHBox = new HBox(5, listViewAddButton, listViewDeleteButton);
+
+		listView = new ListView<String>();
+		listView.setMaxHeight(72);
+		listView.setItems(FXCollections.observableArrayList());
+		listView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+		listView.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
+			listViewDeleteButton.setDisable(newValue == null);
+			listView.refresh();
+		});
+		listView.setCellFactory(param -> new ListCell<String>() {
+			@Override
+			protected void updateItem(String item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null) {
+					setText(null);
+					setBackground(null);
+				} else {
+					setText(item);
+					int index = getIndex();
+					setBackground(index % 2 == 0 ? new Background(new BackgroundFill(Color.LIGHTGRAY, null, null))
+							: new Background(new BackgroundFill(Color.WHITE, null, null)));
+				}
+				setTextFill(Color.BLACK);
+				if (isSelected()) {
+					setBackground(new Background(new BackgroundFill(Color.web("#AFA6D2"), null, null)));
+				}
 			}
 		});
-		sourceHBox.getChildren().addAll(sourceButton, sourceTextField);
 
 		var targetHBox = new HBox(5);
-		var targetButton = new Button("Target Folder ");
+		targetButton = new Button("Target Folder");
 		targetButton.setMinWidth(95);
 		var targetTextField = new TextField();
 		targetTextField.setDisable(true);
@@ -71,12 +101,12 @@ public class App extends Application {
 		});
 		targetHBox.getChildren().addAll(targetButton, targetTextField);
 
-		var copyCheckBox = new CheckBox("Copy");
+		copyCheckBox = new CheckBox("Copy");
 		copyCheckBox.setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
-
 		var processHBox = new HBox(5);
 		orgButton = new Button("Process");
 		orgButton.setMinWidth(60);
+		orgButton.setOnAction(e -> organize(cl, listView, targetTextField, copyCheckBox));
 		stopButton = new Button("Stop");
 		stopButton.setMinWidth(50);
 		stopButton.setDisable(true);
@@ -84,42 +114,89 @@ public class App extends Application {
 		statusField.setDisable(true);
 		statusField.setPrefWidth(570);
 		processHBox.getChildren().addAll(orgButton, stopButton, statusField);
-		orgButton.setOnAction(e -> organize(cl, sourceTextField, targetTextField, copyCheckBox));
 
 		var mainVBox = new VBox(10);
-		mainVBox.getChildren().addAll(sourceHBox, targetHBox, copyCheckBox, new VBox(10), processHBox);
+		mainVBox.getChildren().addAll(listViewHBox, listView, targetHBox, copyCheckBox, new VBox(10), processHBox);
 
 		var mainGridPane = new GridPane();
 		mainGridPane.setPadding(new Insets(15));
-		var bg = new Background(new BackgroundFill(new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
-				new Stop(0, Color.web("#ECA074")), new Stop(1, Color.web("#F39E9C"))), null, null));
-		mainGridPane.setBackground(bg);
+		mainGridPane.setBackground(new Background(new BackgroundFill(//
+				new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE, new Stop(0, Color.web("#ECA074")),
+						new Stop(1, Color.web("#F39E9C"))),
+				null, null)));
 		mainGridPane.getChildren().add(mainVBox);
 
-		Scene scene = new Scene(mainGridPane, 720, 170);
+		Scene scene = new Scene(mainGridPane, 720, 250);
 		scene.getStylesheets().add(cl.getResource("assets/styles.css").toExternalForm());
 
 		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
 
-	private void organize(ClassLoader cl, TextField sourceTextField, TextField targetTextField, CheckBox copyCheckBox) {
-		boolean copy = copyCheckBox.isSelected();
-		var sourceFolderPath = sourceTextField.getText();
-		var targetFolderPath = targetTextField.getText();
-		var sourcePath = Paths.get(sourceFolderPath);
-		var targetPath = Paths.get(targetFolderPath);
-		String msg = Organizer.valid(sourceFolderPath, targetFolderPath, sourcePath, targetPath);
+	private void organize(ClassLoader cl, ListView<String> listView, TextField targetField, CheckBox copyCheckBox) {
+		String msg = Organizer.valid(listView.getItems(), targetField.getText());
 		if (msg == null) {
-			Organizer organizer = new Organizer(copy, sourcePath, targetPath, orgButton, stopButton, statusField);
 			try {
-				organizer.organize();
-			} catch (IOException e) {
+				getOrganizer(listView, targetField, copyCheckBox).organize();
+			} catch (Exception e) {
 				e.printStackTrace();
+				alert(cl, "Fatal error");
 			}
 		} else {
 			alert(cl, msg);
 		}
+	}
+
+	private Organizer getOrganizer(ListView<String> listView, TextField targetField, CheckBox copyCheckBox) {
+		return new Organizer(copyCheckBox.isSelected(), listView.getItems(), targetField.getText()) {
+
+			@Override
+			public void doBeforeOrganize() {
+				stopButton.setOnAction(e -> copyTask.cancel());
+				Platform.runLater(() -> {
+					listView.setDisable(true);
+					listViewAddButton.setDisable(true);
+					targetButton.setDisable(true);
+					copyCheckBox.setDisable(true);
+					orgButton.setDisable(true);
+					stopButton.setDisable(false);
+				});
+				statusField.textProperty().bind(copyTask.messageProperty());
+			}
+
+			@Override
+			public void doAfterOrganize() {
+				statusField.textProperty().unbind();
+				statusField.setText(this.copy ? "Copied Files: " + this.copiedFilesCount
+						: "Processed Files: " + this.copiedFilesCount);
+				Platform.runLater(() -> {
+					listView.setDisable(false);
+					listView.getSelectionModel().clearSelection();
+					listViewAddButton.setDisable(false);
+					targetButton.setDisable(false);
+					copyCheckBox.setDisable(false);
+					orgButton.setDisable(false);
+					stopButton.setDisable(true);
+					orgButton.setDisable(false);
+				});
+			}
+
+		};
+	}
+
+	private void addSourceFolder(ActionEvent event) {
+		File selectedDirectory = new DirectoryChooser().showDialog(null);
+		if (selectedDirectory != null) {
+			listView.getItems().add(selectedDirectory.getAbsolutePath());
+		}
+	}
+
+	private void deleteSourceFolder(ActionEvent event) {
+		String selectedPath = listView.getSelectionModel().getSelectedItem();
+		listView.getItems().remove(selectedPath);
+		listView.getSelectionModel().clearSelection();
+		listViewDeleteButton.setDisable(true);
+		listView.refresh();
 	}
 
 	private static void alert(ClassLoader cl, String message) {
