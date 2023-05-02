@@ -1,132 +1,116 @@
 package com.mandarina;
 
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import com.mandarina.match.FileMatcher;
-import com.mandarina.match.MimeMatcher;
 
 import javafx.collections.ObservableList;
-import javafx.concurrent.Task;
 
 public abstract class Organizer {
 
 	protected boolean copy;
 	protected ObservableList<String> listViewItems;
-	protected String targetField;
+	protected Path targetPath;
 
-	protected Task<Void> copyTask;
-	protected int copiedFilesCount;
+	protected SizeCalculatorTask sizeCalculatorTask;
+	protected OrganizeTask organizeTask;
 
 	private Path failPath;
 	private Path mediaunmatchPath;
 	private Path unmatchPath;
 	private Path matchPath;
 
-	public Organizer(boolean copy, ObservableList<String> listViewItems, String targetField) {
+	private long totalSizeToCopy;
+
+	public Organizer(boolean copy, ObservableList<String> listViewItems, Path targetPath) {
 		this.copy = copy;
 		this.listViewItems = listViewItems;
-		this.targetField = targetField;
+		this.targetPath = targetPath;
 	}
+
+	public abstract void doBeforeSizeCalculator();
+
+	public abstract void doAfterSizeCalculator();
 
 	public abstract void doBeforeOrganize();
 
 	public abstract void doAfterOrganize();
 
 	public void organize() throws Exception {
+		startSizeCalculatorTask();
+	}
+
+	private void startSizeCalculatorTask() {
+		sizeCalculatorTask = new SizeCalculatorTask(listViewItems);
+		sizeCalculatorTask.setOnFailed(e -> doAfterSizeCalculator());
+		sizeCalculatorTask.setOnCancelled(e -> doAfterSizeCalculator());
+		sizeCalculatorTask.setOnSucceeded(e -> doAfterSizeCalculator());
+		sizeCalculatorTask.setOnSucceeded(event -> {
+			totalSizeToCopy = sizeCalculatorTask.getValue();
+			try {
+				if (FileUtil.haveFreeSpace(targetPath, totalSizeToCopy)) {
+					startOrganizeTask();
+				} else {
+					System.out.println("Error");
+				}
+			} catch (IOException e1) {
+				System.out.println("Error");
+				e1.printStackTrace();
+			}
+		});
+
+		doBeforeSizeCalculator();
+		new Thread(sizeCalculatorTask).start();
+	}
+
+	private void startOrganizeTask() throws IOException {
 		initLogs();
-		copiedFilesCount = 0;
-		copyTask = new Task<Void>() {
+		organizeTask = new OrganizeTask(listViewItems, totalSizeToCopy) {
 
 			@Override
-			protected Void call() throws Exception {
-				Thread.sleep(100);
-				for (String s : listViewItems) {
-					Files.walkFileTree(Paths.get(s), new SimpleFileVisitor<Path>() {
-
-						/*
-						 * Copy the directories.
-						 */
-						@Override
-						public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-								throws IOException {
-
-							if (isCancelled()) {
-								return FileVisitResult.TERMINATE;
-							}
-
-							return FileVisitResult.CONTINUE;
-						}
-
-						/*
-						 * Copy the files.
-						 */
-						@Override
-						public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-
-							if (isCancelled()) {
-								return FileVisitResult.TERMINATE;
-							}
-
-							organize(copy, file);
-							copiedFilesCount++;
-							updateMessage(file.toString());
-
-							return FileVisitResult.CONTINUE;
-						}
-					});
-				}
-				return null;
+			public void organize(Path file) {
+				Organizer.this.organize(copy, file);
 			}
 		};
 
+		organizeTask.setOnFailed(e -> doAfterOrganize());
+		organizeTask.setOnCancelled(e -> doAfterOrganize());
+		organizeTask.setOnSucceeded(e -> doAfterOrganize());
+
 		doBeforeOrganize();
-
-		copyTask.setOnFailed(e -> doAfterOrganize());
-		copyTask.setOnCancelled(e -> doAfterOrganize());
-		copyTask.setOnSucceeded(e -> doAfterOrganize());
-
-		new Thread(copyTask).start(); // Run the copy task
+		new Thread(organizeTask).start();
 	}
 
 	protected void initLogs() throws IOException {
-		var logPath = Paths.get(targetField)//
-				.resolve(".logs")//
+		var logPath = targetPath.resolve(".logs")//
 				.resolve(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")));
-		createDirectories(logPath);
+		FileUtil.createDirectories(logPath);
 
 		var mainPath = logPath.resolve("main.log");
-		recreateFile(mainPath);
-		appendLine("dateTime: " + LocalDateTime.now(), mainPath);
-		appendLine("sources: " + listViewItems, mainPath);
-		appendLine("target: " + targetField, mainPath);
-		appendLine("copy: " + copy, mainPath);
+		FileUtil.recreateFile(mainPath);
+		FileUtil.appendLine("dateTime: " + LocalDateTime.now(), mainPath);
+		FileUtil.appendLine("sources: " + listViewItems, mainPath);
+		FileUtil.appendLine("target: " + targetPath, mainPath);
+		FileUtil.appendLine("copy: " + copy, mainPath);
 
 		failPath = logPath.resolve("fail.log");
-		recreateFile(failPath);
+		FileUtil.recreateFile(failPath);
 
 		unmatchPath = logPath.resolve("unmatch.log");
-		recreateFile(unmatchPath);
+		FileUtil.recreateFile(unmatchPath);
 
 		mediaunmatchPath = logPath.resolve("unmatch-media.log");
-		recreateFile(mediaunmatchPath);
+		FileUtil.recreateFile(mediaunmatchPath);
 
 		matchPath = logPath.resolve("match-media.log");
-		recreateFile(matchPath);
+		FileUtil.recreateFile(matchPath);
 	}
 
 	private void organize(boolean copy, Path path) {
@@ -134,56 +118,21 @@ public abstract class Organizer {
 			var match = FileMatcher.match(path);
 			if (match != null) {
 				if (match.getKey() != null) {
-					appendFileName(path, matchPath);
+					FileUtil.appendFileName(path, matchPath);
 					if (copy) {
-						copy(match, path);
+						FileUtil.copy(match, path, targetPath);
 					}
 				} else {
-					appendFileName(path, mediaunmatchPath);
+					FileUtil.appendFileName(path, mediaunmatchPath);
 				}
 			} else {
-				appendFileName(path, unmatchPath);
+				FileUtil.appendFileName(path, unmatchPath);
 			}
 		} catch (Exception e) {
 			try {
-				appendFileName(path, failPath);
+				FileUtil.appendFileName(path, failPath);
 			} catch (IOException e1) {
 			}
-		}
-	}
-
-	private void appendFileName(Path fileNamePath, Path targetPath) throws IOException {
-		appendLine(fileNamePath.toString(), targetPath);
-	}
-
-	private void appendLine(String value, Path matchPath) throws IOException {
-		Files.write(matchPath, getLine(value), StandardOpenOption.APPEND);
-	}
-
-	private void copy(SimpleEntry<MimeMatcher, LocalDate> match, Path path) throws IOException {
-		var datePath = Paths.get(targetField, match.getKey().getLabel(),
-				match.getValue().getYear() + "-" + String.format("%02d", match.getValue().getMonthValue()),
-				path.getFileName().toString());
-		createDirectories(datePath.getParent());
-		Files.copy(path, datePath, StandardCopyOption.REPLACE_EXISTING);
-	}
-
-	private static void createDirectories(Path p) throws IOException {
-		if (!Files.exists(p)) {
-			Files.createDirectories(p);
-		}
-	}
-
-	private static byte[] getLine(String value) {
-		return value.concat(System.lineSeparator()).getBytes();
-	}
-
-	private static void recreateFile(Path p) throws IOException {
-		if (!Files.exists(p)) {
-			Files.createFile(p);
-		} else {
-			Files.delete(p);
-			Files.createFile(p);
 		}
 	}
 
@@ -195,13 +144,13 @@ public abstract class Organizer {
 			return "Required: target folder";
 		}
 		Path targetPath = Paths.get(targetFieldText);
-		if (!isDirectory(targetPath)) {
+		if (!FileUtil.isDirectory(targetPath)) {
 			return "Parameter targetFolder: is not a directory";
 		}
 		for (Path sourcePath : listViewItems.stream()//
 				.map(Paths::get)//
 				.collect(Collectors.toList())) {
-			if (!isDirectory(sourcePath)) {
+			if (!FileUtil.isDirectory(sourcePath)) {
 				return "Parameter sourceFolder: is not a directory";
 			}
 			if (Collections.frequency(listViewItems, sourcePath.toString()) > 1) {
@@ -220,9 +169,5 @@ public abstract class Organizer {
 			}
 		}
 		return null;
-	}
-
-	private static boolean isDirectory(Path p) {
-		return Files.exists(p) && Files.isDirectory(p);
 	}
 }

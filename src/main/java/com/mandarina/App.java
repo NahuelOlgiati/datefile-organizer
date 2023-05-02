@@ -1,6 +1,7 @@
 package com.mandarina;
 
 import java.io.File;
+import java.nio.file.Paths;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -15,6 +16,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -40,6 +42,7 @@ public class App extends Application {
 	private TextField statusField;
 	private Button orgButton;
 	private Button stopButton;
+	private ProgressBar progressBar;
 
 	public static void main(String[] args) throws Exception {
 		launch(args);
@@ -67,25 +70,7 @@ public class App extends Application {
 			listViewDeleteButton.setDisable(newValue == null);
 			listView.refresh();
 		});
-		listView.setCellFactory(param -> new ListCell<String>() {
-			@Override
-			protected void updateItem(String item, boolean empty) {
-				super.updateItem(item, empty);
-				if (empty || item == null) {
-					setText(null);
-					setBackground(null);
-				} else {
-					setText(item);
-					int index = getIndex();
-					setBackground(index % 2 == 0 ? new Background(new BackgroundFill(Color.LIGHTGRAY, null, null))
-							: new Background(new BackgroundFill(Color.WHITE, null, null)));
-				}
-				setTextFill(Color.BLACK);
-				if (isSelected()) {
-					setBackground(new Background(new BackgroundFill(Color.web("#AFA6D2"), null, null)));
-				}
-			}
-		});
+		listView.setCellFactory(param -> listViewCellUpdate());
 
 		var targetHBox = new HBox(5);
 		targetButton = new Button("Target Folder");
@@ -113,10 +98,18 @@ public class App extends Application {
 		statusField = new TextField();
 		statusField.setDisable(true);
 		statusField.setPrefWidth(570);
+		statusField.setVisible(false);
 		processHBox.getChildren().addAll(orgButton, stopButton, statusField);
 
+		progressBar = new ProgressBar();
+		progressBar.setPrefWidth(700);
+		progressBar.setProgress(0);
+		progressBar.setStyle("-fx-accent: #AFA6D2;");
+		progressBar.setVisible(false);
+
 		var mainVBox = new VBox(10);
-		mainVBox.getChildren().addAll(listViewHBox, listView, targetHBox, copyCheckBox, new VBox(10), processHBox);
+		mainVBox.getChildren().addAll(listViewHBox, listView, targetHBox, copyCheckBox, new VBox(10), processHBox,
+				progressBar);
 
 		var mainGridPane = new GridPane();
 		mainGridPane.setPadding(new Insets(15));
@@ -126,7 +119,7 @@ public class App extends Application {
 				null, null)));
 		mainGridPane.getChildren().add(mainVBox);
 
-		Scene scene = new Scene(mainGridPane, 720, 250);
+		Scene scene = new Scene(mainGridPane, 720, 270);
 		scene.getStylesheets().add(cl.getResource("assets/styles.css").toExternalForm());
 
 		primaryStage.setScene(scene);
@@ -148,39 +141,84 @@ public class App extends Application {
 	}
 
 	private Organizer getOrganizer(ListView<String> listView, TextField targetField, CheckBox copyCheckBox) {
-		return new Organizer(copyCheckBox.isSelected(), listView.getItems(), targetField.getText()) {
+		return new Organizer(copyCheckBox.isSelected(), listView.getItems(), Paths.get(targetField.getText())) {
+
+			@Override
+			public void doBeforeSizeCalculator() {
+				disableComponents();
+			}
+
+			@Override
+			public void doAfterSizeCalculator() {
+				enableComponents();
+			}
 
 			@Override
 			public void doBeforeOrganize() {
-				stopButton.setOnAction(e -> copyTask.cancel());
-				Platform.runLater(() -> {
-					listView.setDisable(true);
-					listViewAddButton.setDisable(true);
-					targetButton.setDisable(true);
-					copyCheckBox.setDisable(true);
-					orgButton.setDisable(true);
-					stopButton.setDisable(false);
-				});
-				statusField.textProperty().bind(copyTask.messageProperty());
+				stopButton.setOnAction(e -> organizeTask.cancel());
+				statusField.textProperty().bind(organizeTask.messageProperty());
+				statusField.setVisible(true);
+				progressBar.setVisible(true);
+				progressBar.progressProperty().bind(organizeTask.progressProperty());
+				disableComponents();
 			}
 
 			@Override
 			public void doAfterOrganize() {
 				statusField.textProperty().unbind();
-				statusField.setText(this.copy ? "Copied Files: " + this.copiedFilesCount
-						: "Processed Files: " + this.copiedFilesCount);
-				Platform.runLater(() -> {
-					listView.setDisable(false);
-					listView.getSelectionModel().clearSelection();
-					listViewAddButton.setDisable(false);
-					targetButton.setDisable(false);
-					copyCheckBox.setDisable(false);
-					orgButton.setDisable(false);
-					stopButton.setDisable(true);
-					orgButton.setDisable(false);
-				});
+				progressBar.progressProperty().unbind();
+				progressBar.setProgress(0);
+				progressBar.setVisible(false);
+				statusField.setText(this.copy ? "Copied Files: " + organizeTask.copiedFilesCount
+						: "Processed Files: " + organizeTask.copiedFilesCount);
+				enableComponents();
 			}
+		};
+	}
 
+	private void disableComponents() {
+		Platform.runLater(() -> {
+			listView.setDisable(true);
+			listViewAddButton.setDisable(true);
+			targetButton.setDisable(true);
+			copyCheckBox.setDisable(true);
+			orgButton.setDisable(true);
+			stopButton.setDisable(false);
+		});
+	}
+
+	private void enableComponents() {
+		Platform.runLater(() -> {
+			listView.setDisable(false);
+			listView.getSelectionModel().clearSelection();
+			listViewAddButton.setDisable(false);
+			targetButton.setDisable(false);
+			copyCheckBox.setDisable(false);
+			orgButton.setDisable(false);
+			stopButton.setDisable(true);
+			orgButton.setDisable(false);
+		});
+	}
+
+	private static ListCell<String> listViewCellUpdate() {
+		return new ListCell<String>() {
+			@Override
+			protected void updateItem(String item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null) {
+					setText(null);
+					setBackground(null);
+				} else {
+					setText(item);
+					int index = getIndex();
+					setBackground(index % 2 == 0 ? new Background(new BackgroundFill(Color.LIGHTGRAY, null, null))
+							: new Background(new BackgroundFill(Color.WHITE, null, null)));
+				}
+				setTextFill(Color.BLACK);
+				if (isSelected()) {
+					setBackground(new Background(new BackgroundFill(Color.web("#AFA6D2"), null, null)));
+				}
+			}
 		};
 	}
 
