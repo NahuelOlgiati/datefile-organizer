@@ -40,7 +40,9 @@ public enum DateFormat {
 		while (matcher.find()) {
 			numbers.add(matcher.group());
 		}
-		return numbers.stream().sorted(Comparator.comparingInt(String::length).reversed()).collect(Collectors.toList());
+		return numbers.stream()//
+				.sorted(Comparator.comparingInt(String::length).reversed())//
+				.collect(Collectors.toList());
 	}
 
 	private static LocalDate getLocalDate(DateFormat df, String n) {

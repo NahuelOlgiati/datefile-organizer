@@ -5,18 +5,19 @@ import java.util.concurrent.atomic.AtomicLong;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 
-public class SizeCalculatorTask extends Task<Long> {
+public class SizeCalculationTask extends Task<Long> {
 
-	protected AtomicLong totalWeight;
+	protected AtomicLong totalSize;
 	protected ObservableList<String> listViewItems;
 
-	public SizeCalculatorTask(ObservableList<String> listViewItems) {
-		this.totalWeight = new AtomicLong(0);
+	public SizeCalculationTask(ObservableList<String> listViewItems) {
+		this.totalSize = new AtomicLong(0);
 		this.listViewItems = listViewItems;
 	}
 	
 	@Override
 	protected Long call() throws Exception {
-		return FileUtil.getFolderWeight(listViewItems, totalWeight);
+		Thread.sleep(100);
+		return FileUtil.getFolderSize(listViewItems, totalSize);
 	}
 }

@@ -58,13 +58,13 @@ public class FileUtil {
 		return Files.exists(p) && Files.isDirectory(p);
 	}
 
-	public static long getFolderWeight(ObservableList<String> listViewItems, AtomicLong totalWeight)
+	public static long getFolderSize(ObservableList<String> listViewItems, AtomicLong totalSize)
 			throws IOException {
 		for (String folderPath : listViewItems) {
 			Files.walkFileTree(Paths.get(folderPath), new SimpleFileVisitor<Path>() {
 				@Override
 				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-					totalWeight.addAndGet(attrs.size());
+					totalSize.addAndGet(attrs.size());
 					return FileVisitResult.CONTINUE;
 				}
 
@@ -74,7 +74,7 @@ public class FileUtil {
 				}
 			});
 		}
-		return totalWeight.get();
+		return totalSize.get();
 	}
 
 	public static long getFreeSpaceInBytes(Path path) throws IOException {

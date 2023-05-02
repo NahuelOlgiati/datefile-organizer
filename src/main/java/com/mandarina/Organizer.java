@@ -19,7 +19,7 @@ public abstract class Organizer {
 	protected ObservableList<String> listViewItems;
 	protected Path targetPath;
 
-	protected SizeCalculatorTask sizeCalculatorTask;
+	protected SizeCalculationTask sizeCalculationTask;
 	protected OrganizeTask organizeTask;
 
 	private Path failPath;
@@ -35,39 +35,40 @@ public abstract class Organizer {
 		this.targetPath = targetPath;
 	}
 
-	public abstract void doBeforeSizeCalculator();
+	public abstract void doBeforeSizeCalculation();
 
-	public abstract void doAfterSizeCalculator();
+	public abstract void doAfterSizeCalculation();
 
 	public abstract void doBeforeOrganize();
 
 	public abstract void doAfterOrganize();
+	
+	public abstract void message(String msg);
 
 	public void organize() throws Exception {
-		startSizeCalculatorTask();
+		startSizeCalculationTask();
 	}
 
-	private void startSizeCalculatorTask() {
-		sizeCalculatorTask = new SizeCalculatorTask(listViewItems);
-		sizeCalculatorTask.setOnFailed(e -> doAfterSizeCalculator());
-		sizeCalculatorTask.setOnCancelled(e -> doAfterSizeCalculator());
-		sizeCalculatorTask.setOnSucceeded(e -> doAfterSizeCalculator());
-		sizeCalculatorTask.setOnSucceeded(event -> {
-			totalSizeToCopy = sizeCalculatorTask.getValue();
+	private void startSizeCalculationTask() {
+		sizeCalculationTask = new SizeCalculationTask(listViewItems);
+		sizeCalculationTask.setOnFailed(e -> doAfterSizeCalculation());
+		sizeCalculationTask.setOnCancelled(e -> doAfterSizeCalculation());
+		sizeCalculationTask.setOnSucceeded(e -> doAfterSizeCalculation());
+		sizeCalculationTask.setOnSucceeded(event -> {
+			totalSizeToCopy = sizeCalculationTask.getValue();
 			try {
 				if (FileUtil.haveFreeSpace(targetPath, totalSizeToCopy)) {
 					startOrganizeTask();
 				} else {
-					System.out.println("Error");
+					message("Not enough disk space to perform the task");
 				}
 			} catch (IOException e1) {
-				System.out.println("Error");
 				e1.printStackTrace();
 			}
 		});
 
-		doBeforeSizeCalculator();
-		new Thread(sizeCalculatorTask).start();
+		doBeforeSizeCalculation();
+		new Thread(sizeCalculationTask).start();
 	}
 
 	private void startOrganizeTask() throws IOException {

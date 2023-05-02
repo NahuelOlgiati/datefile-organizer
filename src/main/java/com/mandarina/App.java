@@ -34,6 +34,8 @@ import javafx.stage.Stage;
 
 public class App extends Application {
 
+	private static ClassLoader cl = Thread.currentThread().getContextClassLoader();
+	
 	private ListView<String> listView;
 	private Button listViewAddButton;
 	private Button listViewDeleteButton;
@@ -50,7 +52,6 @@ public class App extends Application {
 
 	@Override
 	public void start(Stage primaryStage) {
-		ClassLoader cl = Thread.currentThread().getContextClassLoader();
 		primaryStage.setTitle("Dforg");
 		primaryStage.getIcons().add(new Image(cl.getResourceAsStream("assets/nina.png")));
 		primaryStage.setResizable(false);
@@ -91,7 +92,7 @@ public class App extends Application {
 		var processHBox = new HBox(5);
 		orgButton = new Button("Process");
 		orgButton.setMinWidth(60);
-		orgButton.setOnAction(e -> organize(cl, listView, targetTextField, copyCheckBox));
+		orgButton.setOnAction(e -> organize(listView, targetTextField, copyCheckBox));
 		stopButton = new Button("Stop");
 		stopButton.setMinWidth(50);
 		stopButton.setDisable(true);
@@ -126,17 +127,17 @@ public class App extends Application {
 		primaryStage.show();
 	}
 
-	private void organize(ClassLoader cl, ListView<String> listView, TextField targetField, CheckBox copyCheckBox) {
+	private void organize(ListView<String> listView, TextField targetField, CheckBox copyCheckBox) {
 		String msg = Organizer.valid(listView.getItems(), targetField.getText());
 		if (msg == null) {
 			try {
 				getOrganizer(listView, targetField, copyCheckBox).organize();
 			} catch (Exception e) {
 				e.printStackTrace();
-				alert(cl, "Fatal error");
+				alert("Fatal error");
 			}
 		} else {
-			alert(cl, msg);
+			alert(msg);
 		}
 	}
 
@@ -144,12 +145,12 @@ public class App extends Application {
 		return new Organizer(copyCheckBox.isSelected(), listView.getItems(), Paths.get(targetField.getText())) {
 
 			@Override
-			public void doBeforeSizeCalculator() {
+			public void doBeforeSizeCalculation() {
 				disableComponents();
 			}
 
 			@Override
-			public void doAfterSizeCalculator() {
+			public void doAfterSizeCalculation() {
 				enableComponents();
 			}
 
@@ -158,20 +159,25 @@ public class App extends Application {
 				stopButton.setOnAction(e -> organizeTask.cancel());
 				statusField.textProperty().bind(organizeTask.messageProperty());
 				statusField.setVisible(true);
-				progressBar.setVisible(true);
 				progressBar.progressProperty().bind(organizeTask.progressProperty());
+				progressBar.setVisible(true);
 				disableComponents();
 			}
 
 			@Override
 			public void doAfterOrganize() {
 				statusField.textProperty().unbind();
+				statusField.setText(this.copy ? "Copied Files: " + organizeTask.copiedFilesCount
+						: "Processed Files: " + organizeTask.copiedFilesCount);
 				progressBar.progressProperty().unbind();
 				progressBar.setProgress(0);
 				progressBar.setVisible(false);
-				statusField.setText(this.copy ? "Copied Files: " + organizeTask.copiedFilesCount
-						: "Processed Files: " + organizeTask.copiedFilesCount);
 				enableComponents();
+			}
+
+			@Override
+			public void message(String msg) {
+				alert(msg);
 			}
 		};
 	}
@@ -180,6 +186,7 @@ public class App extends Application {
 		Platform.runLater(() -> {
 			listView.setDisable(true);
 			listViewAddButton.setDisable(true);
+			listView.getSelectionModel().clearSelection();
 			targetButton.setDisable(true);
 			copyCheckBox.setDisable(true);
 			orgButton.setDisable(true);
@@ -190,7 +197,6 @@ public class App extends Application {
 	private void enableComponents() {
 		Platform.runLater(() -> {
 			listView.setDisable(false);
-			listView.getSelectionModel().clearSelection();
 			listViewAddButton.setDisable(false);
 			targetButton.setDisable(false);
 			copyCheckBox.setDisable(false);
@@ -237,7 +243,7 @@ public class App extends Application {
 		listView.refresh();
 	}
 
-	private static void alert(ClassLoader cl, String message) {
+	private static void alert(String message) {
 		var alert = new Alert(AlertType.WARNING);
 		((Stage) alert.getDialogPane().getScene().getWindow()).getIcons()
 				.add(new Image(cl.getResourceAsStream("assets/nina.png")));

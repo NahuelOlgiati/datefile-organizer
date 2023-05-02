@@ -16,13 +16,13 @@ import javafx.concurrent.Task;
 public abstract class OrganizeTask extends Task<Void> {
 
 	protected AtomicInteger copiedFilesCount;
-	protected AtomicLong totalWeight;
+	protected AtomicLong totalSize;
 	protected ObservableList<String> listViewItems;
 	protected long totalSizeToCopy;
 
 	public OrganizeTask(ObservableList<String> listViewItems, long totalSizeToCopy) {
 		this.copiedFilesCount = new AtomicInteger(0);
-		this.totalWeight = new AtomicLong(0);
+		this.totalSize = new AtomicLong(0);
 		this.listViewItems = listViewItems;
 		this.totalSizeToCopy = totalSizeToCopy;
 	}
@@ -32,8 +32,8 @@ public abstract class OrganizeTask extends Task<Void> {
 	@Override
 	protected Void call() throws Exception {
 		Thread.sleep(100);
-		for (String s : listViewItems) {
-			Files.walkFileTree(Paths.get(s), new SimpleFileVisitor<Path>() {
+		for (String sourceFolder : listViewItems) {
+			Files.walkFileTree(Paths.get(sourceFolder), new SimpleFileVisitor<Path>() {
 
 				@Override
 				public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
@@ -48,11 +48,11 @@ public abstract class OrganizeTask extends Task<Void> {
 					if (isCancelled()) {
 						return FileVisitResult.TERMINATE;
 					}
-					totalWeight.addAndGet(attrs.size());
+					totalSize.addAndGet(attrs.size());
 					organize(file);
 					copiedFilesCount.addAndGet(1);
 					updateMessage(file.toString());
-					updateProgress(totalWeight.get(), totalSizeToCopy);
+					updateProgress(totalSize.get(), totalSizeToCopy);
 					return FileVisitResult.CONTINUE;
 				}
 			});
