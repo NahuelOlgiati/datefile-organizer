@@ -35,7 +35,7 @@ import javafx.stage.Stage;
 public class App extends Application {
 
 	private static ClassLoader cl = Thread.currentThread().getContextClassLoader();
-	
+
 	private ListView<String> listView;
 	private Button listViewAddButton;
 	private Button listViewDeleteButton;
@@ -167,8 +167,7 @@ public class App extends Application {
 			@Override
 			public void doAfterOrganize() {
 				statusField.textProperty().unbind();
-				statusField.setText(this.copy ? "Copied Files: " + organizeTask.copiedFilesCount
-						: "Processed Files: " + organizeTask.copiedFilesCount);
+				statusField.setText("Processed Files: " + organizeTask.processedFileCount);
 				progressBar.progressProperty().unbind();
 				progressBar.setProgress(0);
 				progressBar.setVisible(false);

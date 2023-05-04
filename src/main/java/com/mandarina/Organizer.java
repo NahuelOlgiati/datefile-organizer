@@ -22,10 +22,12 @@ public abstract class Organizer {
 	protected SizeCalculationTask sizeCalculationTask;
 	protected OrganizeTask organizeTask;
 
-	private Path failPath;
-	private Path mediaunmatchPath;
-	private Path unmatchPath;
-	private Path matchPath;
+	private Path notCopiedFailPath;
+	private Path notCopiedMediaPath;
+	private Path notCopiedNotMediaPath;
+	private Path notCopiedRpeatedPath;
+	private Path copiedMediaPath;
+	private Path copiedMediaNameConflictPath;
 
 	private long totalSizeToCopy;
 
@@ -42,7 +44,7 @@ public abstract class Organizer {
 	public abstract void doBeforeOrganize();
 
 	public abstract void doAfterOrganize();
-	
+
 	public abstract void message(String msg);
 
 	public void organize() throws Exception {
@@ -57,7 +59,7 @@ public abstract class Organizer {
 		sizeCalculationTask.setOnSucceeded(event -> {
 			totalSizeToCopy = sizeCalculationTask.getValue();
 			try {
-				if (FileUtil.haveFreeSpace(targetPath, totalSizeToCopy)) {
+				if (FileUtil.hasFreeSpace(targetPath, totalSizeToCopy)) {
 					startOrganizeTask();
 				} else {
 					message("Not enough disk space to perform the task");
@@ -101,37 +103,59 @@ public abstract class Organizer {
 		FileUtil.appendLine("target: " + targetPath, mainPath);
 		FileUtil.appendLine("copy: " + copy, mainPath);
 
-		failPath = logPath.resolve("fail.log");
-		FileUtil.recreateFile(failPath);
+		notCopiedFailPath = logPath.resolve("not-copied-fail.log");
+		FileUtil.recreateFile(notCopiedFailPath);
 
-		unmatchPath = logPath.resolve("unmatch.log");
-		FileUtil.recreateFile(unmatchPath);
+		notCopiedMediaPath = logPath.resolve("not-copied-media.log");
+		FileUtil.recreateFile(notCopiedMediaPath);
 
-		mediaunmatchPath = logPath.resolve("unmatch-media.log");
-		FileUtil.recreateFile(mediaunmatchPath);
+		notCopiedNotMediaPath = logPath.resolve("not-copied-not-media.log");
+		FileUtil.recreateFile(notCopiedNotMediaPath);
 
-		matchPath = logPath.resolve("match-media.log");
-		FileUtil.recreateFile(matchPath);
+		notCopiedRpeatedPath = logPath.resolve("not-copied-repeated.log");
+		FileUtil.recreateFile(notCopiedRpeatedPath);
+
+		copiedMediaPath = logPath.resolve("copied-media.log");
+		FileUtil.recreateFile(copiedMediaPath);
+
+		copiedMediaNameConflictPath = logPath.resolve("copied-media-name-conflict.log");
+		FileUtil.recreateFile(copiedMediaNameConflictPath);
 	}
 
 	private void organize(boolean copy, Path path) {
 		try {
 			var match = FileMatcher.match(path);
-			if (match != null) {
-				if (match.getKey() != null) {
-					FileUtil.appendFileName(path, matchPath);
+			if (match != null && match.getKey() != null) {
+				var dateMatch = match.getValue();
+				if (dateMatch != null) {
 					if (copy) {
-						FileUtil.copy(match, path, targetPath);
+						var mimeMatch = match.getKey();
+						var datePath = FileUtil.getDatePath(mimeMatch, dateMatch, path, targetPath);
+						if (FileUtil.isRegularFile(datePath)) {
+							boolean sameFile = FileUtil.sameFile(path, datePath);
+							if (sameFile) {
+								FileUtil.appendFileName(path, notCopiedRpeatedPath);
+							} else {
+								Path newDatePath = FileUtil.getIncrementedFilename(datePath);
+								FileUtil.appendFileName(datePath, copiedMediaNameConflictPath);
+								FileUtil.appendFileName(newDatePath, copiedMediaNameConflictPath);
+								FileUtil.appendSeparator(copiedMediaNameConflictPath);
+								FileUtil.createFolderAndCopy(newDatePath, path);
+							}
+						} else {
+							FileUtil.appendFileName(path, copiedMediaPath);
+							FileUtil.createFolderAndCopy(datePath, path);
+						}
 					}
 				} else {
-					FileUtil.appendFileName(path, mediaunmatchPath);
+					FileUtil.appendFileName(path, notCopiedMediaPath);
 				}
 			} else {
-				FileUtil.appendFileName(path, unmatchPath);
+				FileUtil.appendFileName(path, notCopiedNotMediaPath);
 			}
 		} catch (Exception e) {
 			try {
-				FileUtil.appendFileName(path, failPath);
+				FileUtil.appendFileName(path, notCopiedFailPath);
 			} catch (IOException e1) {
 			}
 		}

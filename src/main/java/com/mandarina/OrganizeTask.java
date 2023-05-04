@@ -15,13 +15,13 @@ import javafx.concurrent.Task;
 
 public abstract class OrganizeTask extends Task<Void> {
 
-	protected AtomicInteger copiedFilesCount;
+	protected AtomicInteger processedFileCount;
 	protected AtomicLong totalSize;
 	protected ObservableList<String> listViewItems;
 	protected long totalSizeToCopy;
 
 	public OrganizeTask(ObservableList<String> listViewItems, long totalSizeToCopy) {
-		this.copiedFilesCount = new AtomicInteger(0);
+		this.processedFileCount = new AtomicInteger(0);
 		this.totalSize = new AtomicLong(0);
 		this.listViewItems = listViewItems;
 		this.totalSizeToCopy = totalSizeToCopy;
@@ -50,7 +50,7 @@ public abstract class OrganizeTask extends Task<Void> {
 					}
 					totalSize.addAndGet(attrs.size());
 					organize(file);
-					copiedFilesCount.addAndGet(1);
+					processedFileCount.addAndGet(1);
 					updateMessage(file.toString());
 					updateProgress(totalSize.get(), totalSizeToCopy);
 					return FileVisitResult.CONTINUE;
