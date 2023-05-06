@@ -3,7 +3,7 @@ package com.mandarina.match;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public enum MimeMatcher {
+public enum CategoryMatcher {
 	VIDEO("video", "Videos"), //
 	IMAGE("image", "Images"), //,
 	AUDIO("audio", "Audios");
@@ -11,7 +11,7 @@ public enum MimeMatcher {
 	private String mime;
 	private String label;
 
-	MimeMatcher(String mime, String label) {
+	CategoryMatcher(String mime, String label) {
 		this.mime = mime;
 		this.label = label;
 	}
@@ -20,11 +20,11 @@ public enum MimeMatcher {
 		return label;
 	}
 
-	public static MimeMatcher match(Path path) {
-		MimeMatcher r = null;
+	public static CategoryMatcher get(Path path) {
+		CategoryMatcher r = null;
 		try {
 			String mimeType = Files.probeContentType(path);
-			for (MimeMatcher vi : values()) {
+			for (CategoryMatcher vi : values()) {
 				if (mimeType.contains(vi.mime)) {
 					r = vi;
 					break;

@@ -9,20 +9,20 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public enum DateFormat {
+public enum NameDateMatcher {
 	LARGE("yyyyMMdd"), //
 	SHORT("yyMMdd");
 
 	private String format;
 
-	DateFormat(String format) {
+	NameDateMatcher(String format) {
 		this.format = format;
 	}
 
 	public static LocalDate get(Path path) {
 		LocalDate r = null;
 		outerloop: for (String n : getNumbers(path)) {
-			for (DateFormat df : values()) {
+			for (NameDateMatcher df : values()) {
 				var localDate = getLocalDate(df, n);
 				if (localDate != null) {
 					r = localDate;
@@ -45,11 +45,11 @@ public enum DateFormat {
 				.collect(Collectors.toList());
 	}
 
-	private static LocalDate getLocalDate(DateFormat df, String n) {
+	private static LocalDate getLocalDate(NameDateMatcher m, String n) {
 		LocalDate localDate = null;
-		if (df.format.length() == n.length()) {
+		if (m.format.length() == n.length()) {
 			try {
-				localDate = LocalDate.parse(n, DateTimeFormatter.ofPattern(df.format));
+				localDate = LocalDate.parse(n, DateTimeFormatter.ofPattern(m.format));
 			} catch (Exception e) {
 			}
 		}

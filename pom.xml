@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.mandarina</groupId>
 	<artifactId>dforg</artifactId>
@@ -15,8 +17,10 @@
 
 	<scm>
 		<url>https://github.com/NahuelOlgiati/datefile-organizer</url>
-		<connection>scm:git:https://github.com/NahuelOlgiati/datefile-organizer.git</connection>
-		<developerConnection>scm:git:https://github.com/NahuelOlgiati/datefile-organizer.git</developerConnection>
+		<connection>
+			scm:git:https://github.com/NahuelOlgiati/datefile-organizer.git</connection>
+		<developerConnection>
+			scm:git:https://github.com/NahuelOlgiati/datefile-organizer.git</developerConnection>
 		<tag>HEAD</tag>
 	</scm>
 
@@ -38,6 +42,11 @@
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-graphics</artifactId>
 			<version>20.0.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.drewnoakes</groupId>
+			<artifactId>metadata-extractor</artifactId>
+			<version>2.18.0</version>
 		</dependency>
 	</dependencies>
 
@@ -150,7 +159,8 @@
 								<argument>--main-class</argument>
 								<argument>com.mandarina.App</argument>
 								<argument>--main-jar</argument>
-								<argument>./${project.artifactId}-${project.version}.jar</argument>
+								<argument>
+									./${project.artifactId}-${project.version}.jar</argument>
 								<argument>--dest</argument>
 								<argument>${project.build.directory}/release</argument>
 								<argument>--icon</argument>
@@ -169,7 +179,8 @@
 								<argument>--module-path</argument>
 								<argument>${project.build.directory}/mods</argument>
 								<argument>--add-modules</argument>
-								<argument>javafx.base,javafx.controls,javafx.graphics</argument>
+								<argument>
+									javafx.base,javafx.controls,javafx.graphics</argument>
 							</arguments>
 						</configuration>
 					</execution>

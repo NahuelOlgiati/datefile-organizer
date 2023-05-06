@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.mandarina.match.FileMatcher;
+import com.mandarina.task.CalculationTask;
+import com.mandarina.task.OrganizeTask;
 
 import javafx.collections.ObservableList;
 
@@ -19,17 +21,18 @@ public abstract class Organizer {
 	protected ObservableList<String> listViewItems;
 	protected Path targetPath;
 
-	protected SizeCalculationTask sizeCalculationTask;
+	protected CalculationTask calculationTask;
 	protected OrganizeTask organizeTask;
 
-	private Path notCopiedFailPath;
-	private Path notCopiedMediaPath;
-	private Path notCopiedNotMediaPath;
-	private Path notCopiedRpeatedPath;
-	private Path copiedMediaPath;
-	private Path copiedMediaNameConflictPath;
+	protected Path mainPath;
+	protected Path notCopiedFailPath;
+	protected Path notCopiedNotMediaPath;
+	protected Path notCopiedRpeatedPath;
+	protected Path copiedMediaPath;
+	protected Path copiedMediaUnknownDatePath;
+	protected Path copiedMediaNameConflictPath;
 
-	private long totalSizeToCopy;
+	protected long totalSizeToCopy;
 
 	public Organizer(boolean copy, ObservableList<String> listViewItems, Path targetPath) {
 		this.copy = copy;
@@ -37,9 +40,9 @@ public abstract class Organizer {
 		this.targetPath = targetPath;
 	}
 
-	public abstract void doBeforeSizeCalculation();
+	public abstract void doBeforeCalculation();
 
-	public abstract void doAfterSizeCalculation();
+	public abstract void doAfterCalculation();
 
 	public abstract void doBeforeOrganize();
 
@@ -48,33 +51,35 @@ public abstract class Organizer {
 	public abstract void message(String msg);
 
 	public void organize() throws Exception {
-		startSizeCalculationTask();
+		startCalculationTask();
 	}
 
-	private void startSizeCalculationTask() {
-		sizeCalculationTask = new SizeCalculationTask(listViewItems);
-		sizeCalculationTask.setOnFailed(e -> doAfterSizeCalculation());
-		sizeCalculationTask.setOnCancelled(e -> doAfterSizeCalculation());
-		sizeCalculationTask.setOnSucceeded(e -> doAfterSizeCalculation());
-		sizeCalculationTask.setOnSucceeded(event -> {
-			totalSizeToCopy = sizeCalculationTask.getValue();
-			try {
-				if (FileUtil.hasFreeSpace(targetPath, totalSizeToCopy)) {
-					startOrganizeTask();
-				} else {
-					message("Not enough disk space to perform the task");
+	private void startCalculationTask() {
+		calculationTask = new CalculationTask(listViewItems);
+		calculationTask.setOnFailed(e -> doAfterCalculation());
+		calculationTask.setOnCancelled(e -> doAfterCalculation());
+		calculationTask.setOnSucceeded(e -> doAfterCalculation());
+		calculationTask.setOnSucceeded(event -> {
+			totalSizeToCopy = calculationTask.getTotalSize();
+			if (FileUtil.hasFreeSpace(targetPath, totalSizeToCopy)) {
+				try {
+					initLogs();
+				} catch (IOException e1) {
+					message("Fatal error initializing logs");
+					return;
 				}
-			} catch (IOException e1) {
-				e1.printStackTrace();
+				startOrganizeTask();
+			} else {
+				message("Not enough disk space to perform the task");
+				return;
 			}
 		});
 
-		doBeforeSizeCalculation();
-		new Thread(sizeCalculationTask).start();
+		doBeforeCalculation();
+		new Thread(calculationTask).start();
 	}
 
-	private void startOrganizeTask() throws IOException {
-		initLogs();
+	private void startOrganizeTask() {
 		organizeTask = new OrganizeTask(listViewItems, totalSizeToCopy) {
 
 			@Override
@@ -92,22 +97,20 @@ public abstract class Organizer {
 	}
 
 	protected void initLogs() throws IOException {
-		var logPath = targetPath.resolve(".logs")//
-				.resolve(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")));
+		var now = LocalDateTime.now();
+		var folderDateName = now.format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"));
+		var logPath = targetPath.resolve(".logs").resolve(folderDateName);
 		FileUtil.createDirectories(logPath);
 
-		var mainPath = logPath.resolve("main.log");
+		mainPath = logPath.resolve("main.log");
 		FileUtil.recreateFile(mainPath);
-		FileUtil.appendLine("dateTime: " + LocalDateTime.now(), mainPath);
+		FileUtil.appendLine("dateTime: " + now, mainPath);
 		FileUtil.appendLine("sources: " + listViewItems, mainPath);
 		FileUtil.appendLine("target: " + targetPath, mainPath);
 		FileUtil.appendLine("copy: " + copy, mainPath);
 
 		notCopiedFailPath = logPath.resolve("not-copied-fail.log");
 		FileUtil.recreateFile(notCopiedFailPath);
-
-		notCopiedMediaPath = logPath.resolve("not-copied-media.log");
-		FileUtil.recreateFile(notCopiedMediaPath);
 
 		notCopiedNotMediaPath = logPath.resolve("not-copied-not-media.log");
 		FileUtil.recreateFile(notCopiedNotMediaPath);
@@ -118,6 +121,9 @@ public abstract class Organizer {
 		copiedMediaPath = logPath.resolve("copied-media.log");
 		FileUtil.recreateFile(copiedMediaPath);
 
+		copiedMediaUnknownDatePath = logPath.resolve("copied-media-unknown-date.log");
+		FileUtil.recreateFile(copiedMediaUnknownDatePath);
+
 		copiedMediaNameConflictPath = logPath.resolve("copied-media-name-conflict.log");
 		FileUtil.recreateFile(copiedMediaNameConflictPath);
 	}
@@ -126,29 +132,35 @@ public abstract class Organizer {
 		try {
 			var match = FileMatcher.match(path);
 			if (match != null && match.getKey() != null) {
+				var mimeMatch = match.getKey();
 				var dateMatch = match.getValue();
 				if (dateMatch != null) {
-					if (copy) {
-						var mimeMatch = match.getKey();
-						var datePath = FileUtil.getDatePath(mimeMatch, dateMatch, path, targetPath);
-						if (FileUtil.isRegularFile(datePath)) {
-							boolean sameFile = FileUtil.sameFile(path, datePath);
-							if (sameFile) {
-								FileUtil.appendFileName(path, notCopiedRpeatedPath);
-							} else {
-								Path newDatePath = FileUtil.getIncrementedFilename(datePath);
-								FileUtil.appendFileName(datePath, copiedMediaNameConflictPath);
-								FileUtil.appendFileName(newDatePath, copiedMediaNameConflictPath);
-								FileUtil.appendSeparator(copiedMediaNameConflictPath);
+					var datePath = FileUtil.getDatePath(mimeMatch, dateMatch, path, targetPath);
+					if (FileUtil.isRegularFile(datePath)) {
+						boolean sameFile = FileUtil.sameFile(path, datePath);
+						if (sameFile) {
+							FileUtil.appendFileName(path, notCopiedRpeatedPath);
+						} else {
+							Path newDatePath = FileUtil.getIncrementedFilename(datePath);
+							FileUtil.appendFileName(datePath, copiedMediaNameConflictPath);
+							FileUtil.appendFileName(newDatePath, copiedMediaNameConflictPath);
+							FileUtil.appendSeparator(copiedMediaNameConflictPath);
+							if (copy) {
 								FileUtil.createFolderAndCopy(newDatePath, path);
 							}
-						} else {
-							FileUtil.appendFileName(path, copiedMediaPath);
+						}
+					} else {
+						FileUtil.appendFileName(path, copiedMediaPath);
+						if (copy) {
 							FileUtil.createFolderAndCopy(datePath, path);
 						}
 					}
 				} else {
-					FileUtil.appendFileName(path, notCopiedMediaPath);
+					FileUtil.appendFileName(path, copiedMediaUnknownDatePath);
+					if (copy) {
+						var unkownDatePath = FileUtil.getUnkownDatePath(mimeMatch, path, targetPath);
+						FileUtil.createFolderAndCopy(unkownDatePath, path);
+					}
 				}
 			} else {
 				FileUtil.appendFileName(path, notCopiedNotMediaPath);
@@ -172,9 +184,8 @@ public abstract class Organizer {
 		if (!FileUtil.isDirectory(targetPath)) {
 			return "Parameter targetFolder: is not a directory";
 		}
-		for (Path sourcePath : listViewItems.stream()//
-				.map(Paths::get)//
-				.collect(Collectors.toList())) {
+		var listViewPaths = listViewItems.stream().map(Paths::get).collect(Collectors.toList());
+		for (Path sourcePath : listViewPaths) {
 			if (!FileUtil.isDirectory(sourcePath)) {
 				return "Parameter sourceFolder: is not a directory";
 			}

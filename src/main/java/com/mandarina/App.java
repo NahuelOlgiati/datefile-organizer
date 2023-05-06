@@ -1,6 +1,7 @@
 package com.mandarina;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 
 import javafx.application.Application;
@@ -145,12 +146,12 @@ public class App extends Application {
 		return new Organizer(copyCheckBox.isSelected(), listView.getItems(), Paths.get(targetField.getText())) {
 
 			@Override
-			public void doBeforeSizeCalculation() {
+			public void doBeforeCalculation() {
 				disableComponents();
 			}
 
 			@Override
-			public void doAfterSizeCalculation() {
+			public void doAfterCalculation() {
 				enableComponents();
 			}
 
@@ -167,7 +168,12 @@ public class App extends Application {
 			@Override
 			public void doAfterOrganize() {
 				statusField.textProperty().unbind();
-				statusField.setText("Processed Files: " + organizeTask.processedFileCount);
+				var pf = "Processed Files: " + organizeTask.getProcessedCount() + " of " + calculationTask.getCount();
+				try {
+					FileUtil.appendLine(pf, mainPath);
+				} catch (IOException e) {
+				}
+				statusField.setText(pf);
 				progressBar.progressProperty().unbind();
 				progressBar.setProgress(0);
 				progressBar.setVisible(false);

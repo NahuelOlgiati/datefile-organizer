@@ -1,4 +1,4 @@
-package com.mandarina;
+package com.mandarina.task;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -15,14 +15,14 @@ import javafx.concurrent.Task;
 
 public abstract class OrganizeTask extends Task<Void> {
 
-	protected AtomicInteger processedFileCount;
-	protected AtomicLong totalSize;
+	protected AtomicInteger processedCount;
+	protected AtomicLong processedSize;
 	protected ObservableList<String> listViewItems;
 	protected long totalSizeToCopy;
 
 	public OrganizeTask(ObservableList<String> listViewItems, long totalSizeToCopy) {
-		this.processedFileCount = new AtomicInteger(0);
-		this.totalSize = new AtomicLong(0);
+		this.processedCount = new AtomicInteger(0);
+		this.processedSize = new AtomicLong(0);
 		this.listViewItems = listViewItems;
 		this.totalSizeToCopy = totalSizeToCopy;
 	}
@@ -48,11 +48,11 @@ public abstract class OrganizeTask extends Task<Void> {
 					if (isCancelled()) {
 						return FileVisitResult.TERMINATE;
 					}
-					totalSize.addAndGet(attrs.size());
+					processedSize.addAndGet(attrs.size());
 					organize(file);
-					processedFileCount.addAndGet(1);
+					processedCount.addAndGet(1);
 					updateMessage(file.toString());
-					updateProgress(totalSize.get(), totalSizeToCopy);
+					updateProgress(processedSize.get(), totalSizeToCopy);
 					return FileVisitResult.CONTINUE;
 				}
 			});
@@ -60,4 +60,11 @@ public abstract class OrganizeTask extends Task<Void> {
 		return null;
 	}
 
+	public int getProcessedCount() {
+		return processedCount.get();
+	}
+
+	public long getProcessedSize() {
+		return processedSize.get();
+	}
 }

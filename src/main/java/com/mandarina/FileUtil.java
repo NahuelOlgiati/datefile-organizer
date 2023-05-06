@@ -1,22 +1,16 @@
 package com.mandarina;
 
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.time.LocalDate;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
-import com.mandarina.match.MimeMatcher;
-
-import javafx.collections.ObservableList;
+import com.mandarina.match.CategoryMatcher;
 
 public class FileUtil {
 
@@ -37,10 +31,13 @@ public class FileUtil {
 		Files.copy(path, datePath, StandardCopyOption.REPLACE_EXISTING);
 	}
 
-	public static Path getDatePath(MimeMatcher mimeMatch, LocalDate dateMatch, Path path, Path targetPath) {
-		return Paths.get(targetPath.toString(), mimeMatch.getLabel(),
-				dateMatch.getYear() + "-" + String.format("%02d", dateMatch.getMonthValue()),
-				path.getFileName().toString());
+	public static Path getDatePath(CategoryMatcher categoryMatch, LocalDate date, Path path, Path targetPath) {
+		return Paths.get(targetPath.toString(), categoryMatch.getLabel(),
+				date.getYear() + "-" + String.format("%02d", date.getMonthValue()), path.getFileName().toString());
+	}
+
+	public static Path getUnkownDatePath(CategoryMatcher categoryMatch, Path path, Path targetPath) {
+		return Paths.get(targetPath.toString(), categoryMatch.getLabel(), "unknowDate", path.getFileName().toString());
 	}
 
 	public static void createDirectories(Path p) throws IOException {
@@ -74,30 +71,16 @@ public class FileUtil {
 		return Files.exists(p) && Files.isRegularFile(p);
 	}
 
-	public static long getFolderSize(ObservableList<String> listViewItems, AtomicLong totalSize) throws IOException {
-		for (String folderPath : listViewItems) {
-			Files.walkFileTree(Paths.get(folderPath), new SimpleFileVisitor<Path>() {
-				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-					totalSize.addAndGet(attrs.size());
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-					return FileVisitResult.CONTINUE;
-				}
-			});
-		}
-		return totalSize.get();
-	}
-
 	public static long getFreeSpaceInBytes(Path path) throws IOException {
 		return Files.getFileStore(path).getUsableSpace();
 	}
 
-	public static boolean hasFreeSpace(Path path, long sizeToCopy) throws IOException {
-		return getFreeSpaceInBytes(path) > sizeToCopy;
+	public static boolean hasFreeSpace(Path path, long sizeToCopy) {
+		try {
+			return getFreeSpaceInBytes(path) > sizeToCopy;
+		} catch (IOException e) {
+		}
+		return false;
 	}
 
 	public static boolean sameFile(Path a, Path b) throws Exception {
